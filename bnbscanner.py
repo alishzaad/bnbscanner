@@ -57,13 +57,12 @@ def main():
             balance = check_addresses(address)
             
             # نمایش اطلاعات در ترمینال
-            sys.stdout.write("\033[K")  # پاک کردن خط قبلی
-            status = f"Private Key: {private_hex[:6]}... | BNB Address: {address[:6]}... ({balance if isinstance(balance, int) else balance})"
-            print(f"\r{status}", end="", flush=True)
+            status = f"Private Key: {private_hex} | BNB Address: {address} | Balance: {balance if isinstance(balance, int) else balance}"
+            print(status)
             
             # بررسی موجودی و خطاها
             if isinstance(balance, int) and balance > 0:
-                print("\n\n!!! موجودی یافت شد !!!")
+                print(f"\n{Fore.GREEN}!!! موجودی یافت شد !!!{Style.RESET_ALL}")
                 print(f"کلید خصوصی (Hex): {private_hex}")
                 print(f"آدرس BNB: {address}")
                 print(f"موجودی: {balance} wei")  # موجودی به صورت wei نمایش داده می‌شود
@@ -75,7 +74,7 @@ def main():
                     f.write(f"Balance: {balance} wei\n\n")
                 sys.exit(0)
             elif isinstance(balance, str):  # نمایش خطاها
-                print(f"\n\n!!! خطا !!!")
+                print(f"{Fore.RED}!!! خطا !!!{Style.RESET_ALL}")
                 print(f"آدرس BNB: {address}")
                 print(f"خطا: {balance}")
                 
