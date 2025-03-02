@@ -3,8 +3,10 @@ import hashlib
 import ecdsa
 import requests
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from colorama import Fore, Style, init
+import threading
 
 # Initialize colorama
 init()
@@ -25,7 +27,7 @@ def generate_bnb_smart_chain_address(private_hex):
     
     return address
 
-# --- بررسی موجودی با ThreadPool ---
+# --- بررسی موجودی BNB ---
 def check_bnb_balance(address):
     try:
         # استفاده از API BSCScan برای بررسی موجودی BNB
@@ -41,43 +43,49 @@ def check_bnb_balance(address):
     except requests.exceptions.RequestException as e:
         return f"{Fore.RED}Error: {e}{Style.RESET_ALL}"  # نمایش خطا با رنگ قرمز
 
-def check_addresses(address):
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future = executor.submit(check_bnb_balance, address)
-        return future.result()
+# --- شمارنده و قفل برای هماهنگی در چاپ ---
+counter = 0
+counter_lock = threading.Lock()
 
-# --- اجرای اصلی ---
+def process_address():
+    global counter
+    private_hex = generate_private_key()
+    address = generate_bnb_smart_chain_address(private_hex)
+    balance = check_bnb_balance(address)
+    
+    with counter_lock:
+        counter += 1
+        current_count = counter
+
+    # آماده‌سازی رشته خروجی با استفاده از شمارنده
+    if isinstance(balance, int):
+        status = f"#{current_count} | Private Key: {private_hex} | BNB Address: {address} | Balance: {balance} wei"
+    else:
+        status = f"#{current_count} | Private Key: {private_hex} | BNB Address: {address} | Balance: {balance}"
+    print(status)
+
+    # در صورت یافتن موجودی مثبت، اطلاعات ذخیره شده و برنامه خاتمه می‌یابد
+    if isinstance(balance, int) and balance > 0:
+        print(f"\n{Fore.GREEN}!!! موجودی یافت شد !!!{Style.RESET_ALL}")
+        print(f"کلید خصوصی (Hex): {private_hex}")
+        print(f"آدرس BNB: {address}")
+        print(f"موجودی: {balance} wei")
+        
+        with open('found_bnb_smart_chain.txt', 'a') as f:
+            f.write(f"Private Key (Hex): {private_hex}\n")
+            f.write(f"BNB Address: {address}\n")
+            f.write(f"Balance: {balance} wei\n\n")
+        sys.exit(0)
+
 def main():
     try:
-        while True:
-            private_hex = generate_private_key()
-            address = generate_bnb_smart_chain_address(private_hex)
-            
-            # بررسی موجودی برای آدرس BNB
-            balance = check_addresses(address)
-            
-            # نمایش اطلاعات در ترمینال
-            status = f"Private Key: {private_hex} | BNB Address: {address} | Balance: {balance if isinstance(balance, int) else balance}"
-            print(status)
-            
-            # بررسی موجودی و خطاها
-            if isinstance(balance, int) and balance > 0:
-                print(f"\n{Fore.GREEN}!!! موجودی یافت شد !!!{Style.RESET_ALL}")
-                print(f"کلید خصوصی (Hex): {private_hex}")
-                print(f"آدرس BNB: {address}")
-                print(f"موجودی: {balance} wei")  # موجودی به صورت wei نمایش داده می‌شود
-                
-                # ذخیره اطلاعات در فایل
-                with open('found_bnb_smart_chain.txt', 'a') as f:
-                    f.write(f"Private Key (Hex): {private_hex}\n")
-                    f.write(f"BNB Address: {address}\n")
-                    f.write(f"Balance: {balance} wei\n\n")
-                sys.exit(0)
-            elif isinstance(balance, str):  # نمایش خطاها
-                print(f"{Fore.RED}!!! خطا !!!{Style.RESET_ALL}")
-                print(f"آدرس BNB: {address}")
-                print(f"خطا: {balance}")
-                
+        # استفاده از ThreadPoolExecutor برای اجرای همزمان تسک‌ها
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            while True:
+                # در هر ثانیه ۵ آدرس تولید و بررسی می‌شود
+                for _ in range(5):
+                    executor.submit(process_address)
+                time.sleep(1)
     except KeyboardInterrupt:
         print("\n\nعملیات توسط کاربر لغو شد.")
 
